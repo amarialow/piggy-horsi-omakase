@@ -23,6 +23,9 @@ Database management: Dbeaver
 Data Visualization: Tableau / Power BI
 Data Sources: The Sushi Legend, Yelp, Google Maps
 
+Dashboards
+![Dashboard](images/PiggyHorsiDashboard.jpg)
+
 📂 Data Collection & Preparation
 
 Data Sources
