@@ -33,6 +33,13 @@ New York City has seen a surge in high-end omakase experiences, but the market r
 | The Sushi Legend, Yelp, Google Maps | Data Sources |
 
 ---
+
+## 📊 Dashboard
+
+![Dashboard](images/PiggyHorsiDashboard.jpg)
+
+---
+
 ## 📂 Data Collection & Preparation
 
 ### Data Sources
