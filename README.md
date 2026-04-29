@@ -40,6 +40,12 @@ New York City has seen a surge in high-end omakase experiences, but the market r
 
 ---
 
+## ER Diagram
+
+![ER Diagram](images/omakase_er_diagram.jpg)
+
+---
+
 ## 📂 Data Collection & Preparation
 
 ### Data Sources
@@ -74,9 +80,8 @@ df.to_csv('review.csv', index=False)
 - Imported the CSV data into PostgreSQL
 
 ### Data Cleaning Steps
-- Removed duplicates and irrelevant cuisines
-- Filtered for omakase and Japanese fine dining
-- Standardized price ranges into numeric values
+- Removed duplicates
+- Made "name" column unique
 - Handled missing/null values
 
 ---
