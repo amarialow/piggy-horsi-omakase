@@ -90,18 +90,14 @@ df.to_csv('review.csv', index=False)
 
 ### 1. Market Landscape
 
-**Which neighborhoods are most saturated?**
+**Which neighborhood has the most omakase restaurants?**
 
 ```sql
-SELECT 
-    neighborhood,
-    COUNT(*) AS total
+SELECT neighborhood, COUNT(*) AS total
 FROM public.nyc_omakase
 GROUP BY neighborhood
 ORDER BY total DESC;
 ```
-
-### 2. Pricing Strategy
 
 **Top 10 most expensive and cheapest omakase by neighborhood**
 
@@ -119,6 +115,23 @@ ORDER BY price_min ASC
 LIMIT 10);
 ```
 
+**Which are the top 10 highest rated omakase on Yelp?**
+
+```sql
+SELECT
+    o.name,
+    o.neighborhood,
+    r.overall_rating,
+    r.total_review
+FROM public.nyc_omakase o
+JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
+WHERE r.overall_rating > 0
+ORDER BY r.overall_rating DESC, r.total_review DESC
+LIMIT 10;
+```
+
+### 2. Pricing Strategy
+
 **What is the average omakase price?**
 
 ```sql
@@ -129,41 +142,201 @@ WHERE price_min IS NOT NULL
   AND price_max IS NOT NULL;
 ```
 
-**Does higher price correlate with higher ratings?**
+**What is the average price per neighborhood?**
 
 ```sql
-SELECT 
-    price_per_person, 
-    AVG(rating) AS avg_rating
-FROM restaurants
-GROUP BY price_per_person
-ORDER BY price_per_person;
+SELECT
+    neighborhood,
+    ROUND(AVG((price_min + price_max) / 2.0), 2) AS avg_price
+FROM public.nyc_omakase
+WHERE price_min IS NOT NULL AND price_max IS NOT NULL
+GROUP BY neighborhood
+ORDER BY avg_price DESC;
+```
+
+**Does price correlate with Yelp rating?**
+
+```sql
+SELECT
+    o.name,
+    o.neighborhood,
+    ROUND((o.price_min + o.price_max) / 2.0, 2) AS avg_price,
+    r.overall_rating
+FROM public.nyc_omakase o
+JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
+WHERE o.price_min IS NOT NULL AND r.overall_rating > 0
+ORDER BY avg_price DESC;
+```
+
+**Which restaurant offers the best value (highest rating per dollar)?**
+
+```sql
+SELECT
+    o.name,
+    o.neighborhood,
+    ROUND((o.price_min + o.price_max) / 2.0, 2) AS avg_price,
+    r.overall_rating,
+    ROUND(r.overall_rating / ((o.price_min + o.price_max) / 2.0) * 100, 4) AS rating_per_dollar
+FROM public.nyc_omakase o
+JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
+WHERE o.price_min IS NOT NULL AND r.overall_rating > 0
+ORDER BY rating_per_dollar DESC
+LIMIT 10;
+```
+
+**What is the price per course for each restaurant (cost efficiency)?**
+
+```sql
+SELECT
+    name,
+    neighborhood,
+    ROUND((price_min + price_max) / 2.0, 2) AS avg_price,
+    ROUND((courses_min + courses_max) / 2.0, 1) AS avg_courses,
+    ROUND(((price_min + price_max) / 2.0) / ((courses_min + courses_max) / 2.0), 2) AS price_per_course
+FROM public.nyc_omakase
+WHERE price_min IS NOT NULL AND courses_min IS NOT NULL
+ORDER BY price_per_course ASC;
 ```
 
 ### 3. Customer Demand
 
-**Which restaurants perform best?**
+**Which neighborhood has the best average Yelp rating?**
 
 ```sql
-SELECT name, rating, review_count
-FROM restaurants
-ORDER BY rating DESC, review_count DESC
+SELECT
+    o.neighborhood,
+    ROUND(AVG(r.overall_rating), 2) AS avg_rating,
+    COUNT(*) AS total_rated
+FROM public.nyc_omakase o
+JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
+WHERE r.overall_rating > 0
+GROUP BY o.neighborhood
+ORDER BY avg_rating DESC;
+```
+
+**What percentage of reviews are 5-star per restaurant?**
+
+```sql
+SELECT
+    name,
+    overall_rating,
+    total_review,
+    five_star,
+    ROUND(five_star * 100.0 / NULLIF(total_review, 0), 1) AS pct_five_star
+FROM public.nyc_omakase_yelp_ratings
+WHERE total_review > 0
+ORDER BY pct_five_star DESC
+LIMIT 15;
+```
+
+**Which restaurants have the most polarizing reviews (high 1-star AND 5-star counts)?**
+
+```sql
+SELECT
+    name,
+    overall_rating,
+    one_star,
+    five_star,
+    total_review,
+    ROUND((one_star + five_star) * 100.0 / NULLIF(total_review, 0), 1) AS polarization_pct
+FROM public.nyc_omakase_yelp_ratings
+WHERE total_review > 20
+ORDER BY polarization_pct DESC
 LIMIT 10;
 ```
 
-### 4. Location Opportunity
-
-**Where is demand high but competition low?**
+**What is the most common price range across all restaurants?**
 
 ```sql
-SELECT 
+SELECT
+    CASE
+        WHEN (price_min + price_max) / 2.0 < 75  THEN 'Budget (under $75)'
+        WHEN (price_min + price_max) / 2.0 < 150 THEN 'Mid-range ($75–$149)'
+        WHEN (price_min + price_max) / 2.0 < 300 THEN 'Premium ($150–$299)'
+        ELSE 'Luxury ($300+)'
+    END AS price_tier,
+    COUNT(*) AS total
+FROM public.nyc_omakase
+WHERE price_min IS NOT NULL
+GROUP BY price_tier
+ORDER BY total DESC;
+```
+
+**Which restaurants include gratuity and how do they compare in price and rating?**
+
+```sql
+SELECT
+    o.gratuity_included,
+    COUNT(*) AS total,
+    ROUND(AVG((o.price_min + o.price_max) / 2.0), 2) AS avg_price,
+    ROUND(AVG(r.overall_rating), 2) AS avg_rating
+FROM public.nyc_omakase o
+LEFT JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
+WHERE o.price_min IS NOT NULL AND r.overall_rating > 0
+GROUP BY o.gratuity_included;
+```
+
+**Which neighborhood has the best value (most courses per dollar)?**
+
+```sql
+SELECT
     neighborhood,
-    COUNT(*) AS restaurant_count,
-    AVG(review_count) AS avg_demand
-FROM restaurants
-WHERE cuisine = 'Omakase'
+    ROUND(AVG((courses_min + courses_max) / 2.0), 1) AS avg_courses,
+    ROUND(AVG((price_min + price_max) / 2.0), 2) AS avg_price,
+    ROUND(AVG((courses_min + courses_max) / 2.0) / AVG((price_min + price_max) / 2.0), 4)  AS courses_per_dollar
+FROM public.nyc_omakase
+WHERE price_min IS NOT NULL AND courses_min IS NOT NULL
 GROUP BY neighborhood
-ORDER BY avg_demand DESC, restaurant_count ASC;
+ORDER BY courses_per_dollar DESC;
+```
+
+**What is the cheapest highly rated omakase (rating ≥ 4.5, price under $150)?**
+
+```sql
+SELECT
+    o.name,
+    o.neighborhood,
+    ROUND((o.price_min + o.price_max) / 2.0, 2) AS avg_price,
+    r.overall_rating,
+    r.total_review
+FROM public.nyc_omakase o
+JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
+WHERE r.overall_rating >= 4.5
+  AND (o.price_min + o.price_max) / 2.0 < 150
+  AND r.total_review > 10
+ORDER BY avg_price ASC;
+```
+
+**Which restaurants have the most Yelp reviews (most popular)?**
+
+```sql
+SELECT
+    o.name,
+    o.neighborhood,
+    ROUND((o.price_min + o.price_max) / 2.0, 2) AS avg_price,
+    r.overall_rating,
+    r.total_review
+FROM public.nyc_omakase o
+JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
+WHERE r.total_review > 0
+ORDER BY r.total_review DESC
+LIMIT 10;
+```
+
+**Hidden gems — highly rated but low review count (underrated spots)?**
+
+```sql
+SELECT
+    o.name,
+    o.neighborhood,
+    ROUND((o.price_min + o.price_max) / 2.0, 2) AS avg_price,
+    r.overall_rating,
+    r.total_review
+FROM public.nyc_omakase o
+JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
+WHERE r.overall_rating >= 4.7
+  AND r.total_review BETWEEN 5 AND 50
+ORDER BY r.overall_rating DESC, r.total_review ASC;
 ```
 
 ---
@@ -171,7 +344,7 @@ ORDER BY avg_demand DESC, restaurant_count ASC;
 ## 📊 Visualizations
 
 ### Tools
-- Tableau / Power BI / Python (matplotlib, seaborn)
+- Tableau / Power BI
 
 ### Key Visuals
 
