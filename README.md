@@ -5,11 +5,40 @@
 
 ---
 
-## 📌 Executive Summary
+## 📋 Table of Contents
 
-This project explores the feasibility of opening a new omakase restaurant, **Piggy Horsi: Unstable Omakase**, in New York City using SQL-driven analysis. By examining restaurant data (pricing, ratings, locations, and customer demand), the goal is to identify underserved neighborhoods, optimal pricing strategies, and competitive positioning opportunities.
+- [📌 Executive Summary](#-executive-summary)
+- [📖 Project Description](#-project-description)
+- [🛠️ Tech Stack](#️-tech-stack)
+- [🗄️ Data Model](#️-data-model)
+- [📂 Data Collection & Preparation](#-data-collection--preparation)
+- [❓ Key Business Questions & SQL Analysis](#-key-business-questions--sql-analysis)
+  - [🏙️ Market Landscape](#️-market-landscape)
+  - [💰 Pricing Strategy](#-pricing-strategy)
+  - [⭐ Customer Sentiment](#-customer-sentiment)
+  - [💡 Value Analysis](#-value-analysis)
+  - [🔍 Opportunity & Competitive Positioning](#-opportunity--competitive-positioning)
+- [📊 Visualizations](#-visualizations)
+- [💡 Key Insights & Recommendations](#-key-insights--recommendations)
+- [⚠️ Limitations](#️-limitations)
+- [🚀 Future Improvements](#-future-improvements)
+- [▶️ How to Run](#️-how-to-run)
+- [🗂️ Project Structure](#️-project-structure)
+- [👤 Author](#-author)
 
 ---
+
+## 📌 Executive Summary
+
+This project analyzes 172 omakase restaurants across NYC to identify 
+the optimal location and pricing strategy for launching **Piggy Horsi: 
+Unstable Omakase**. Key findings reveal that Lower Manhattan has the 
+highest concentration of restaurants (73), while Brooklyn offers the 
+best value at an average of $X per course. Mid-range pricing ($150–$299) 
+correlates with the highest Yelp ratings.
+
+---
+
 ## 📖 Project Description
 
 New York City has seen a surge in high-end omakase experiences, but the market remains unevenly distributed. This project analyzes:
@@ -34,16 +63,17 @@ New York City has seen a surge in high-end omakase experiences, but the market r
 
 ---
 
-## 📊 Dashboard
-
-![Dashboard](images/PiggyHorsiDashboard.jpg)
-
----
-
 ## ER Diagram
 
 ![ER Diagram](images/omakase_er_diagram.jpg)
 
+## 🗄️ Data Model
+| Table | Rows | Description |
+|---|---|---|
+| nyc_omakase | 172 | Restaurant list from The Sushi Legend |
+| nyc_omakase_yelp_ratings | 165 | Yelp ratings and review breakdown |
+
+**Relationship:** One-to-one via `name` (FK → UK)
 ---
 
 ## 📂 Data Collection & Preparation
@@ -51,7 +81,7 @@ New York City has seen a surge in high-end omakase experiences, but the market r
 ### Data Sources
 - [The Sushi Legend](https://thesushilegend.com/nyc-omakase-list-2026/)
 - [Yelp Open Dataset](https://business.yelp.com/data/resources/open-dataset/)
-- Google Maps
+- [Yelp](https://www.yelp.com/) 
 
 ### Data Preparation
 
@@ -63,6 +93,7 @@ New York City has seen a surge in high-end omakase experiences, but the market r
 **2. Yelp Open Dataset**
 - Downloaded the [Yelp Open Dataset](https://business.yelp.com/data/resources/open-dataset/)
 - Used Pandas to convert `business.json` and `review.json` to `.csv` files
+- Imported Rating data from CSV to PostgresSQL
 
 ```python
 import pandas as pd
@@ -79,6 +110,9 @@ df.to_csv('review.csv', index=False)
 
 - Imported the CSV data into PostgreSQL
 
+**3. Yelp**
+- Data from Yelp.com was used to gather information not available in the Yelp Open Dataset.
+
 ### Data Cleaning Steps
 - Removed duplicates
 - Made "name" column unique
@@ -88,7 +122,7 @@ df.to_csv('review.csv', index=False)
 
 ## ❓ Key Business Questions & SQL Analysis
 
-### 1. Market Landscape
+### 🏙️ Market Landscape
 
 **Which neighborhood has the most omakase restaurants?**
 
@@ -97,6 +131,44 @@ SELECT neighborhood, COUNT(*) AS total
 FROM public.nyc_omakase
 GROUP BY neighborhood
 ORDER BY total DESC;
+```
+
+| neighborhood | total |
+|---|---|
+| Lower Manhattan | 73 |
+| Midtown Manhattan | 32 |
+| Upper Manhattan | 32 |
+| Brooklyn | 29 |
+| Queens | 11 |
+
+**What is the most common price range across all restaurants?**
+
+```sql
+SELECT
+    CASE
+        WHEN (price_min + price_max) / 2.0 < 75  THEN 'Budget (under $75)'
+        WHEN (price_min + price_max) / 2.0 < 150 THEN 'Mid-range ($75–$149)'
+        WHEN (price_min + price_max) / 2.0 < 300 THEN 'Premium ($150–$299)'
+        ELSE 'Luxury ($300+)'
+    END AS price_tier,
+    COUNT(*) AS total
+FROM public.nyc_omakase
+WHERE price_min IS NOT NULL
+GROUP BY price_tier
+ORDER BY total DESC;
+```
+
+
+### 💰 Pricing Strategy  
+
+**What is the average omakase price?**
+
+```sql
+SELECT 
+    ROUND(AVG((price_min + price_max) / 2.0), 2) AS avg_price
+FROM public.nyc_omakase
+WHERE price_min IS NOT NULL
+  AND price_max IS NOT NULL;
 ```
 
 **Top 10 most expensive and cheapest omakase by neighborhood**
@@ -115,33 +187,6 @@ ORDER BY price_min ASC
 LIMIT 10);
 ```
 
-**Which are the top 10 highest rated omakase on Yelp?**
-
-```sql
-SELECT
-    o.name,
-    o.neighborhood,
-    r.overall_rating,
-    r.total_review
-FROM public.nyc_omakase o
-JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
-WHERE r.overall_rating > 0
-ORDER BY r.overall_rating DESC, r.total_review DESC
-LIMIT 10;
-```
-
-### 2. Pricing Strategy
-
-**What is the average omakase price?**
-
-```sql
-SELECT 
-    ROUND(AVG((price_min + price_max) / 2.0), 2) AS avg_price
-FROM public.nyc_omakase
-WHERE price_min IS NOT NULL
-  AND price_max IS NOT NULL;
-```
-
 **What is the average price per neighborhood?**
 
 ```sql
@@ -154,33 +199,20 @@ GROUP BY neighborhood
 ORDER BY avg_price DESC;
 ```
 
-**Does price correlate with Yelp rating?**
+### ⭐ Customer Sentiment
+
+**Which are the top 10 highest rated omakase on Yelp?**
 
 ```sql
 SELECT
     o.name,
     o.neighborhood,
-    ROUND((o.price_min + o.price_max) / 2.0, 2) AS avg_price,
-    r.overall_rating
-FROM public.nyc_omakase o
-JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
-WHERE o.price_min IS NOT NULL AND r.overall_rating > 0
-ORDER BY avg_price DESC;
-```
-
-**Which restaurant offers the best value (highest rating per dollar)?**
-
-```sql
-SELECT
-    o.name,
-    o.neighborhood,
-    ROUND((o.price_min + o.price_max) / 2.0, 2) AS avg_price,
     r.overall_rating,
-    ROUND(r.overall_rating / ((o.price_min + o.price_max) / 2.0) * 100, 4) AS rating_per_dollar
+    r.total_review
 FROM public.nyc_omakase o
 JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
-WHERE o.price_min IS NOT NULL AND r.overall_rating > 0
-ORDER BY rating_per_dollar DESC
+WHERE r.overall_rating > 0 AND r.total_review >= 20 
+ORDER BY r.overall_rating DESC, r.total_review DESC
 LIMIT 10;
 ```
 
@@ -196,22 +228,6 @@ SELECT
 FROM public.nyc_omakase
 WHERE price_min IS NOT NULL AND courses_min IS NOT NULL
 ORDER BY price_per_course ASC;
-```
-
-### 3. Customer Demand
-
-**Which neighborhood has the best average Yelp rating?**
-
-```sql
-SELECT
-    o.neighborhood,
-    ROUND(AVG(r.overall_rating), 2) AS avg_rating,
-    COUNT(*) AS total_rated
-FROM public.nyc_omakase o
-JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
-WHERE r.overall_rating > 0
-GROUP BY o.neighborhood
-ORDER BY avg_rating DESC;
 ```
 
 **What percentage of reviews are 5-star per restaurant?**
@@ -245,22 +261,6 @@ ORDER BY polarization_pct DESC
 LIMIT 10;
 ```
 
-**What is the most common price range across all restaurants?**
-
-```sql
-SELECT
-    CASE
-        WHEN (price_min + price_max) / 2.0 < 75  THEN 'Budget (under $75)'
-        WHEN (price_min + price_max) / 2.0 < 150 THEN 'Mid-range ($75–$149)'
-        WHEN (price_min + price_max) / 2.0 < 300 THEN 'Premium ($150–$299)'
-        ELSE 'Luxury ($300+)'
-    END AS price_tier,
-    COUNT(*) AS total
-FROM public.nyc_omakase
-WHERE price_min IS NOT NULL
-GROUP BY price_tier
-ORDER BY total DESC;
-```
 
 **Which restaurants include gratuity and how do they compare in price and rating?**
 
@@ -274,37 +274,6 @@ FROM public.nyc_omakase o
 LEFT JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
 WHERE o.price_min IS NOT NULL AND r.overall_rating > 0
 GROUP BY o.gratuity_included;
-```
-
-**Which neighborhood has the best value (most courses per dollar)?**
-
-```sql
-SELECT
-    neighborhood,
-    ROUND(AVG((courses_min + courses_max) / 2.0), 1) AS avg_courses,
-    ROUND(AVG((price_min + price_max) / 2.0), 2) AS avg_price,
-    ROUND(AVG((courses_min + courses_max) / 2.0) / AVG((price_min + price_max) / 2.0), 4)  AS courses_per_dollar
-FROM public.nyc_omakase
-WHERE price_min IS NOT NULL AND courses_min IS NOT NULL
-GROUP BY neighborhood
-ORDER BY courses_per_dollar DESC;
-```
-
-**What is the cheapest highly rated omakase (rating ≥ 4.5, price under $150)?**
-
-```sql
-SELECT
-    o.name,
-    o.neighborhood,
-    ROUND((o.price_min + o.price_max) / 2.0, 2) AS avg_price,
-    r.overall_rating,
-    r.total_review
-FROM public.nyc_omakase o
-JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
-WHERE r.overall_rating >= 4.5
-  AND (o.price_min + o.price_max) / 2.0 < 150
-  AND r.total_review > 10
-ORDER BY avg_price ASC;
 ```
 
 **Which restaurants have the most Yelp reviews (most popular)?**
@@ -321,6 +290,85 @@ JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
 WHERE r.total_review > 0
 ORDER BY r.total_review DESC
 LIMIT 10;
+```
+
+### 💡 Value Analysis
+
+**Which neighborhood has the best average Yelp rating?**
+
+```sql
+SELECT
+    o.neighborhood,
+    ROUND(AVG(r.overall_rating), 2) AS avg_rating,
+    COUNT(*) AS total_rated
+FROM public.nyc_omakase o
+JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
+WHERE r.overall_rating > 0
+GROUP BY o.neighborhood
+ORDER BY avg_rating DESC;
+```
+
+**Which restaurant offers the best value (highest rating per dollar)?**
+
+```sql
+SELECT
+    o.name,
+    o.neighborhood,
+    ROUND((o.price_min + o.price_max) / 2.0, 2) AS avg_price,
+    r.overall_rating,
+    ROUND(r.overall_rating / ((o.price_min + o.price_max) / 2.0) * 100, 4) AS rating_per_dollar
+FROM public.nyc_omakase o
+JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
+WHERE o.price_min IS NOT NULL AND r.overall_rating > 0
+ORDER BY rating_per_dollar DESC
+LIMIT 10;
+```
+
+**Which neighborhood has the best value (most courses per dollar)?**
+
+```sql
+SELECT
+    neighborhood,
+    ROUND(AVG((courses_min + courses_max) / 2.0), 1) AS avg_courses,
+    ROUND(AVG((price_min + price_max) / 2.0), 2) AS avg_price,
+    ROUND(AVG((courses_min + courses_max) / 2.0) / AVG((price_min + price_max) / 2.0), 4)  AS courses_per_dollar
+FROM public.nyc_omakase
+WHERE price_min IS NOT NULL AND courses_min IS NOT NULL
+GROUP BY neighborhood
+ORDER BY courses_per_dollar DESC;
+```
+
+**Does price correlate with Yelp rating?**
+
+```sql
+SELECT
+    o.name,
+    o.neighborhood,
+    ROUND((o.price_min + o.price_max) / 2.0, 2) AS avg_price,
+    r.overall_rating
+FROM public.nyc_omakase o
+JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
+WHERE o.price_min IS NOT NULL AND r.overall_rating > 0
+ORDER BY avg_price DESC;
+```
+
+### 🔍 Opportunity & Competitive Positioning
+
+**What is the cheapest highly rated omakase (rating ≥ 4.5, price under $150)?**
+
+```sql
+SELECT
+    o.name,
+    o.neighborhood,
+    ROUND((o.price_min + o.price_max) / 2.0, 2) AS avg_price,
+    r.overall_rating,
+    r.total_review
+FROM public.nyc_omakase o
+JOIN public.nyc_omakase_yelp_ratings r ON o.name = r.name
+WHERE r.overall_rating >= 4.5
+  AND (o.price_min + o.price_max) / 2.0 < 150
+  AND r.total_review > 10
+ORDER BY avg_price ASC;
 ```
 
 **Hidden gems — highly rated but low review count (underrated spots)?**
@@ -343,17 +391,11 @@ ORDER BY r.overall_rating DESC, r.total_review ASC;
 
 ## 📊 Visualizations
 
-### Tools
-- Tableau / Power BI
+### 📊 Dashboard
 
-### Key Visuals
+![Dashboard](images/PiggyHorsiDashboard.jpg)
 
-| Visual | Description |
-|---|---|
-| 🗺️ NYC Map | Restaurant density by neighborhood |
-| 📊 Bar Chart | Top neighborhoods by omakase count |
-| 📈 Scatter Plot | Price vs Rating |
-| 🔥 Heatmap | Demand vs Competition |
+---
 
 ### Insights
 - High-density areas (e.g., Manhattan) show strong competition
@@ -367,20 +409,6 @@ ORDER BY r.overall_rating DESC, r.total_review ASC;
 - **Best Locations:** Neighborhoods with high review counts but fewer competitors
 - **Optimal Pricing:** Mid-to-high tier pricing performs best
 - **Market Gap:** Opportunity for premium experiences outside saturated areas
-
----
-
-## 🗂️ Project Structure
-
-```
-/data
-/sql
-  ├── create_nyc_omakase_table.sql
-  └── analysis.sql
-/visualizations
-/notebooks
-README.md
-```
 
 ---
 
@@ -402,13 +430,28 @@ README.md
 ---
 
 ## ▶️ How to Run
-
-1. Clone the repository
+1. Clone this repository
 2. Set up PostgreSQL and create the database
-3. Run `sql/create_nyc_omakase_table.sql` to create the schema
-4. Import the CSV data files
-5. Run `sql/analysis.sql` for the analysis queries
-6. Connect to Tableau / Power BI for visualizations
+3. Run `sql/01_create_tables.sql` to create the schema
+4. Import `data/nyc_omakase_2026.csv` into `nyc_omakase`
+5. Import `data/nyc_omakase_yelp_ratings.csv` into `nyc_omakase_yelp_ratings`
+6. Run `sql/02_analysis.sql` for all analysis queries
+7. Open Tableau/Power BI and connect to the database for visualizations
+
+---
+
+## 🗂️ Project Structure
+/data
+  ├── nyc_omakase_2026.csv
+  └── nyc_omakase_yelp_ratings.csv
+/sql
+  ├── 01_create_tables.sql
+  ├── 02_load_data.sql
+  └── 03_analysis.sql
+/images
+  ├── er_diagram.jpg
+  └── dashboard.jpg
+README.md
 
 ---
 
