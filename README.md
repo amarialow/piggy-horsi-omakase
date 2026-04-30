@@ -73,7 +73,8 @@ New York City has seen a surge in high-end omakase experiences, but the market r
 | nyc_omakase | 172 | Restaurant list from The Sushi Legend |
 | nyc_omakase_yelp_ratings | 165 | Yelp ratings and review breakdown |
 
-**Relationship:** One-to-one via `name` (FK → UK)
+Relationship: One-to-one via `name` (FK → UK)
+
 ---
 
 ## 📂 Data Collection & Preparation
