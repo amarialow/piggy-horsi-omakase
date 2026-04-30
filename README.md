@@ -442,6 +442,8 @@ ORDER BY r.overall_rating DESC, r.total_review ASC;
 ---
 
 ## 🗂️ Project Structure
+
+```
 /data
   ├── nyc_omakase_2026.csv
   └── nyc_omakase_yelp_ratings.csv
@@ -451,8 +453,10 @@ ORDER BY r.overall_rating DESC, r.total_review ASC;
   └── 03_analysis.sql
 /images
   ├── er_diagram.jpg
-  └── dashboard.jpg
+  ├── dashboard.jpg
+  └── photo.jpg
 README.md
+```
 
 ---
 
